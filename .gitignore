@@ -5,6 +5,7 @@ build/
 dist/
 wheels/
 *.egg-info
+FileSharing.spec
 
 # Virtual environments
 .venv
