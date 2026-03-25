@@ -41,7 +41,9 @@ const discovery = {
 };
 
 async function getGdriveToken(): Promise<string> {
-  const redirectUri = AuthSession.makeRedirectUri({ scheme: "discordfileuploader" });
+  // Expo Go 개발 환경: useProxy: true → https://auth.expo.io 를 경유
+  // 프로덕션 빌드 시: useProxy: false, scheme: "discordfileuploader" 로 변경
+  const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
   const codeVerifier  = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA256,
     Math.random().toString(),
