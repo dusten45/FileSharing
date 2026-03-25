@@ -166,12 +166,13 @@ Expo Go 개발 환경에서는 **웹 애플리케이션** 타입의 클라이언
 1. [Google Cloud Console](https://console.cloud.google.com) → 기존 프로젝트 선택
 2. **API 및 서비스** → **사용자 인증 정보** → **+ 사용자 인증 정보 만들기** → **OAuth 클라이언트 ID**
 3. 애플리케이션 유형: **웹 애플리케이션** 선택
-4. **승인된 리디렉션 URI**에 아래 두 줄 추가:
+4. **승인된 리디렉션 URI**에 아래 한 줄 추가:
    ```
    https://auth.expo.io/@YOUR_EXPO_USERNAME/discordfileuploader
-   exp://localhost:8081
    ```
    > Expo 사용자명 확인: `npx expo whoami` (로그인 필요 시 `npx expo login` 먼저)
+   >
+   > ⚠️ `exp://` 같은 커스텀 스킴은 Web 타입 클라이언트에서 허용되지 않으므로 추가하지 마세요.
 5. 생성 후 **클라이언트 ID** 복사 (`....apps.googleusercontent.com` 형태, JSON 다운로드 불필요)
 
 ### 2-3. 앱 설정 및 실행
