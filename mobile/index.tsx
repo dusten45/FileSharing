@@ -4,6 +4,7 @@ const SIZE_LIMIT_MB       = 10;
 const GDRIVE_CLIENT_ID    = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
 // ─────────────────────────────────────────────────────────────────────────────
 
+import { registerRootComponent } from "expo";
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -261,3 +262,5 @@ const s = StyleSheet.create({
   scroll:       { flex: 1 },
   logText:      { color: C.text, fontFamily: "monospace", fontSize: 12, lineHeight: 18 },
 });
+
+registerRootComponent(App);
