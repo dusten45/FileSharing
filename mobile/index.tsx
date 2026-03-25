@@ -4,6 +4,7 @@ const SIZE_LIMIT_MB       = 10;
 const GDRIVE_CLIENT_ID    = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
 // ─────────────────────────────────────────────────────────────────────────────
 
+import "expo/build/Expo.fx"; // Expo 런타임 초기화 (TurboModule 등록) — 반드시 첫 줄
 import { registerRootComponent } from "expo";
 import React, { useState } from "react";
 import {
