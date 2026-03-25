@@ -4,7 +4,6 @@ const SIZE_LIMIT_MB       = 10;
 const GDRIVE_CLIENT_ID    = "YOUR_GOOGLE_OAUTH_CLIENT_ID";
 // ─────────────────────────────────────────────────────────────────────────────
 
-import "expo/build/Expo.fx"; // Expo 런타임 초기화 (TurboModule 등록) — 반드시 첫 줄
 import { registerRootComponent } from "expo";
 import React, { useState } from "react";
 import {
@@ -19,7 +18,6 @@ import {
 import * as DocumentPicker from "expo-document-picker";
 import * as AuthSession from "expo-auth-session";
 import * as WebBrowser from "expo-web-browser";
-import * as Crypto from "expo-crypto";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -42,15 +40,21 @@ const discovery = {
   tokenEndpoint:         "https://oauth2.googleapis.com/token",
 };
 
+/** PKCE code_verifier: 43자 이상 URL-safe 랜덤 문자열 (RFC 7636) */
+function generateCodeVerifier(): string {
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~";
+  let result = "";
+  for (let i = 0; i < 64; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return result;
+}
+
 async function getGdriveToken(): Promise<string> {
   // Expo Go 개발 환경: useProxy: true → https://auth.expo.io 를 경유
   // 프로덕션 빌드 시: useProxy: false, scheme: "discordfileuploader" 로 변경
   const redirectUri = AuthSession.makeRedirectUri({ useProxy: true });
-  const codeVerifier  = await Crypto.digestStringAsync(
-    Crypto.CryptoDigestAlgorithm.SHA256,
-    Math.random().toString(),
-    { encoding: Crypto.CryptoEncoding.BASE64 }
-  );
+  const codeVerifier = generateCodeVerifier();
   const request = new AuthSession.AuthRequest({
     clientId:            GDRIVE_CLIENT_ID,
     scopes:              GDRIVE_SCOPES,
