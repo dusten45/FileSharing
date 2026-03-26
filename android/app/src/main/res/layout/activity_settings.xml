@@ -36,10 +36,8 @@
                 android:id="@+id/etWebhookUrl"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/hint_webhook_url"
                 android:textColor="@color/discord_text"
-                android:inputType="textUri"
-                android:textColorHint="@color/discord_text_muted" />
+                android:inputType="textUri" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
@@ -57,10 +55,8 @@
                 android:id="@+id/etSizeLimit"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:hint="@string/hint_size_limit"
                 android:textColor="@color/discord_text"
-                android:inputType="numberDecimal"
-                android:textColorHint="@color/discord_text_muted" />
+                android:inputType="numberDecimal" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
