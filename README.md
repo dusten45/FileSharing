@@ -10,7 +10,7 @@
 | 폴더 (원본 × 0.85 ≤ 기준) | zip 압축 후 크기 재확인 → Discord 직접 or Drive |
 | 폴더 (원본 × 0.85 > 기준) | zip 없이 Drive에 폴더 구조 그대로 업로드 |
 
-> PC 앱 + Android(Expo) 앱 모두 동일한 로직으로 동작합니다.
+> PC 앱 + Android 앱 모두 동일한 로직으로 동작합니다.
 
 ---
 
@@ -23,7 +23,7 @@
    - [Google Drive API 설정](#1-4-google-drive-api-설정)
    - [.env 작성](#1-5-env-작성)
    - [최초 실행 및 Google 인증](#1-6-최초-실행-및-google-인증)
-2. [Android 앱 설정 (Expo)](#2-android-앱-설정-expo)
+2. [Android 앱 설정](#2-android-앱-설정)
    - [환경 준비](#2-1-환경-준비)
    - [Google OAuth 클라이언트 ID 생성 (Android용)](#2-2-google-oauth-클라이언트-id-생성-android용)
    - [앱 설정 및 실행](#2-3-앱-설정-및-실행)
@@ -134,7 +134,7 @@ python main.py
 
 ---
 
-## 2. Android 앱 설정 (Expo)
+## 2. Android 앱 설정
 
 TODO
 
@@ -151,7 +151,7 @@ FileSharing/
 ├── .env                     # 실제 설정 (직접 생성, git 제외)
 ├── credentials.json         # Google OAuth 키 (직접 배치, git 제외)
 ├── token.pickle             # Google 인증 토큰 (자동 생성, git 제외)
-└── mobile/                  # Android Expo 앱
+└── mobile/                  # Android 앱
     └── ???
 ```
 
