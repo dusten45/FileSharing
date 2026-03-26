@@ -1,6 +1,12 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+val localProps = Properties().also {
+    rootProject.file("local.properties").inputStream().use { stream -> it.load(stream) }
 }
 
 android {
@@ -15,16 +21,12 @@ android {
         versionName = "1.0"
     }
 
-     val localProps = java.util.Properties().apply {
-        load(rootProject.file("local.properties").inputStream())
-    }
-
     signingConfigs {
         create("release") {
             storeFile = file("release.jks")
-            storePassword = localProps["RELEASE_STORE_PASSWORD"] as String
+            storePassword = localProps.getProperty("RELEASE_STORE_PASSWORD")
             keyAlias = "filesharing"
-            keyPassword = localProps["RELEASE_KEY_PASSWORD"] as String
+            keyPassword = localProps.getProperty("RELEASE_KEY_PASSWORD")
         }
     }
 
