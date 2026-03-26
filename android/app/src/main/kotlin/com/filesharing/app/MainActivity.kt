@@ -12,7 +12,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.filesharing.app.databinding.ActivityMainBinding
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.common.api.ApiException
 import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.flow.collectLatest
@@ -40,13 +39,15 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 파일 선택 (ACTION_OPEN_DOCUMENT)
+    // 파일 선택 (ACTION_OPEN_MULTIPLE_DOCUMENTS)
     private val filePicker = registerForActivityResult(
-        ActivityResultContracts.OpenDocument()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            viewModel.processFile(uri)
+        ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris: List<Uri> ->
+        if (uris.isNotEmpty()) {
+            uris.forEach { uri ->
+                contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            viewModel.processFiles(uris)
         }
     }
 
@@ -87,6 +88,18 @@ class MainActivity : AppCompatActivity() {
                 // 자동 스크롤
                 binding.scrollLog.post {
                     binding.scrollLog.fullScroll(android.view.View.FOCUS_DOWN)
+                }
+            }
+        }
+
+        // 진행률 텍스트 표시
+        lifecycleScope.launch {
+            viewModel.progressText.collectLatest { text ->
+                if (text != null) {
+                    binding.tvProgress.visibility = android.view.View.VISIBLE
+                    binding.tvProgress.text = text
+                } else {
+                    binding.tvProgress.visibility = android.view.View.GONE
                 }
             }
         }
