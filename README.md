@@ -136,67 +136,7 @@ python main.py
 
 ## 2. Android 앱 설정 (Expo)
 
-> Android는 OS 정책상 폴더 선택이 지원되지 않으므로 **파일 단위**만 업로드 가능합니다.
-
-### 2-1. 환경 준비
-
-**Node.js 18 이상** 및 **npm** 필요. 설치 여부 확인:
-
-```bash
-node --version
-npm --version
-```
-
-[nodejs.org](https://nodejs.org/)에서 다운로드 가능합니다.
-
-스마트폰에 **Expo Go** 앱 설치:
-- [Android — Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent)
-
-```bash
-cd mobile
-npm install
-```
-
-### 2-2. Google OAuth 클라이언트 ID 생성 (Android용)
-
-PC 앱과 별도로 **Android 전용** OAuth 클라이언트 ID가 필요합니다.
-
-1. [Google Cloud Console](https://console.cloud.google.com) → 기존 프로젝트 선택
-2. **API 및 서비스** → **사용자 인증 정보** → **+ 사용자 인증 정보 만들기** → **OAuth 클라이언트 ID**
-3. 애플리케이션 유형: **Android** 선택
-4. 패키지 이름: `com.discordfileuploader.app` 입력
-5. SHA-1 인증서 지문: Expo Go 개발용은 아래 명령으로 획득
-
-   ```bash
-   # Windows (JDK 설치 필요)
-   keytool -list -v -keystore "%USERPROFILE%\.android\debug.keystore" -alias androiddebugkey -storepass android -keypass android
-   ```
-
-   출력에서 `SHA1:` 값 복사 후 입력
-6. 생성 후 **클라이언트 ID** 복사 (JSON 다운로드 불필요)
-
-### 2-3. 앱 설정 및 실행
-
-`mobile/index.tsx` **상단 3줄**만 채우면 됩니다:
-
-```typescript
-const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN";
-const SIZE_LIMIT_MB       = 10;
-const GDRIVE_CLIENT_ID    = "YOUR_CLIENT_ID.apps.googleusercontent.com";
-```
-
-앱 실행:
-
-```bash
-cd mobile
-npx expo start
-```
-
-터미널에 QR 코드가 표시되면, 스마트폰의 **Expo Go** 앱을 열고 QR 코드를 스캔합니다.
-
-> PC와 스마트폰이 **같은 Wi-Fi**에 연결되어 있어야 합니다.
-
-파일 업로드 시 Google 인증이 필요할 때마다 브라우저 창이 열립니다 (Android OAuth 정상 동작).
+TODO
 
 ---
 
@@ -212,10 +152,7 @@ FileSharing/
 ├── credentials.json         # Google OAuth 키 (직접 배치, git 제외)
 ├── token.pickle             # Google 인증 토큰 (자동 생성, git 제외)
 └── mobile/                  # Android Expo 앱
-    ├── index.tsx            # 앱 진입점 (상단 3줄 설정)
-    ├── package.json
-    ├── app.json
-    └── tsconfig.json
+    └── ???
 ```
 
 ---
@@ -223,6 +160,6 @@ FileSharing/
 ## 4. 주의사항
 
 - **`credentials.json`**, **`token.pickle`**, **`.env`** 는 절대 공유하거나 git에 올리지 마세요. (`.gitignore`에 이미 포함)
-- Google Drive에 업로드된 파일/폴더는 **링크가 있는 모든 사람**이 볼 수 있습니다.
+- Google Drive에 업로드된 파일/폴더는 **링크가 있는 모든 사람**이 뷰어 권한을 가지고 볼 수 있습니다. 편집은 불가능합니다.
 - `SIZE_LIMIT_MB`는 `.env`에서 자유롭게 조정 가능합니다. Discord Webhook의 실제 업로드 한도는 서버 부스트 등급에 따라 다릅니다 (기본 10 MB, Tier 2: 50 MB, Tier 3: 100 MB).
 - Google Cloud Console의 OAuth 동의 화면이 **테스트** 상태인 경우, 테스트 사용자로 추가된 계정만 인증이 가능합니다.
