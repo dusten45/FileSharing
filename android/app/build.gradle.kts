@@ -15,9 +15,23 @@ android {
         versionName = "1.0"
     }
 
+     val localProps = java.util.Properties().apply {
+        load(rootProject.file("local.properties").inputStream())
+    }
+
+    signingConfigs {
+        create("release") {
+            storeFile = file("release.jks")
+            storePassword = localProps["RELEASE_STORE_PASSWORD"] as String
+            keyAlias = "filesharing"
+            keyPassword = localProps["RELEASE_KEY_PASSWORD"] as String
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
