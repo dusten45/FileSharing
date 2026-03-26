@@ -13,3 +13,12 @@ FileSharing.spec
 .env
 credentials.json
 token.pickle
+
+# Android
+android/local.properties
+android/app/google-services.json
+android/build/
+android/.gradle/
+android/app/release/
+android/app/build/
+*.jks

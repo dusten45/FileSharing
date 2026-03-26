@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">FileSharing</string>
+    <string name="btn_pick_file">📂 파일 선택</string>
+    <string name="btn_pick_folder">📁 폴더 선택</string>
+    <string name="btn_pick_file_busy">업로드 중…</string>
+    <string name="btn_pick_folder_busy">업로드 중…</string>
+    <string name="menu_settings">설정</string>
+    <string name="settings_title">설정</string>
+    <string name="label_webhook_url">Discord Webhook URL</string>
+    <string name="hint_webhook_url">https://discord.com/api/webhooks/…</string>
+    <string name="label_size_limit">파일 크기 제한 (MB)</string>
+    <string name="hint_size_limit">기본값: 10</string>
+    <string name="btn_save">저장</string>
+    <string name="info_text">파일이 크기 제한 이하면 Discord에 직접 업로드하고,\n초과하면 Google Drive에 업로드 후 링크를 Discord로 전송합니다.</string>
+    <string name="sign_in_required">Google 계정 로그인이 필요합니다.</string>
+    <string name="webhook_not_set">설정에서 Discord Webhook URL을 입력해주세요.</string>
+    <string name="sign_in_failed">Google 로그인에 실패했습니다.</string>
+    <string name="settings_saved">설정이 저장되었습니다.</string>
+    <string name="log_placeholder">로그가 여기에 표시됩니다…</string>
+</resources>

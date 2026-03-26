@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/discord_dark">
+
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/discord_darkest"
+        app:title="@string/settings_title"
+        app:titleTextColor="@color/discord_text"
+        app:navigationIcon="@drawable/ic_arrow_back"
+        app:navigationIconTint="@color/discord_text" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="16dp"
+            android:hint="@string/label_webhook_url"
+            app:boxBackgroundColor="@color/discord_darker"
+            app:boxStrokeColor="@color/discord_blurple"
+            app:hintTextColor="@color/discord_text_muted"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etWebhookUrl"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_webhook_url"
+                android:textColor="@color/discord_text"
+                android:inputType="textUri"
+                android:textColorHint="@color/discord_text_muted" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp"
+            android:hint="@string/label_size_limit"
+            app:boxBackgroundColor="@color/discord_darker"
+            app:boxStrokeColor="@color/discord_blurple"
+            app:hintTextColor="@color/discord_text_muted"
+            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/etSizeLimit"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:hint="@string/hint_size_limit"
+                android:textColor="@color/discord_text"
+                android:inputType="numberDecimal"
+                android:textColorHint="@color/discord_text_muted" />
+
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnSave"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/btn_save"
+            android:textColor="@color/white"
+            app:backgroundTint="@color/discord_blurple"
+            app:cornerRadius="4dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Discord 색상 -->
+    <color name="discord_blurple">#5865F2</color>
+    <color name="discord_dark">#1e1f22</color>
+    <color name="discord_darker">#2b2d31</color>
+    <color name="discord_darkest">#111214</color>
+    <color name="discord_text">#dbdee1</color>
+    <color name="discord_text_muted">#80848e</color>
+    <color name="discord_green">#3ba55c</color>
+    <color name="discord_red">#ed4245</color>
+    <color name="discord_yellow">#faa61a</color>
+    <color name="white">#FFFFFF</color>
+</resources>

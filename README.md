@@ -136,7 +136,56 @@ python main.py
 
 ## 2. Android 앱 설정
 
-TODO
+### 2-1. 환경 준비
+
+- **Android Studio** (최신 버전) 설치: [developer.android.com/studio](https://developer.android.com/studio)
+- Android Studio 설치 시 함께 설치되는 **JDK 17** 이상 필요
+
+### 2-2. Google OAuth 클라이언트 ID 생성 (Android용)
+
+PC 앱과 **동일한 Google Cloud 프로젝트**를 사용합니다. Google Drive API와 OAuth 동의 화면은 이미 설정되어 있으므로 클라이언트 ID만 추가로 생성합니다.
+
+> PC 앱 설정을 아직 하지 않았다면 먼저 [1-4. Google Drive API 설정](#1-4-google-drive-api-설정)의 **3-1 ~ 3-3** 단계를 완료하세요.
+
+#### 디버그 키스토어 SHA-1 확인
+
+```bash
+# Windows
+keytool -list -v -keystore "%USERPROFILE%\.android\debug.keystore" -alias androiddebugkey -storepass android -keypass android
+
+# macOS / Linux
+keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -storepass android -keypass android
+```
+
+출력 중 `SHA1:` 항목의 값을 복사해둡니다.
+
+#### Android용 OAuth 클라이언트 ID 생성
+
+1. [Google Cloud Console](https://console.cloud.google.com) → **API 및 서비스** → **사용자 인증 정보**
+2. **+ 사용자 인증 정보 만들기** → **OAuth 클라이언트 ID**
+3. 애플리케이션 유형: **Android** 선택
+4. 패키지 이름: `com.filesharing.app` 입력
+5. SHA-1 인증서 지문: 위에서 복사한 SHA-1 값 입력
+6. **만들기** 클릭
+
+#### google-services.json 다운로드 및 배치
+
+1. 클라이언트 ID 목록에서 방금 만든 Android 항목 우측 다운로드(↓) 버튼 클릭
+2. 다운로드된 파일을 **`android/app/google-services.json`** 경로에 배치
+
+### 2-3. 앱 설정 및 실행
+
+1. **Android Studio** 실행 → **Open** → 이 프로젝트의 **`android/`** 폴더 선택
+2. Gradle 동기화가 자동으로 시작됩니다. 완료까지 기다립니다.
+3. 에뮬레이터 또는 실기기를 연결한 뒤 **▶ Run** 버튼 클릭
+4. 앱 첫 실행 시 Google 계정 로그인 화면이 표시됩니다. 로그인합니다.
+5. 우측 상단 ⚙️ **설정** 버튼 → Discord Webhook URL 입력 후 **저장**
+6. **📂 파일 선택** 또는 **📁 폴더 선택** 버튼으로 업로드 시작
+
+| 설정 항목 | 설명 |
+|-----------|------|
+| Discord Webhook URL | Discord에서 복사한 웹후크 URL |
+| 파일 크기 제한 (MB) | 이 크기 이하면 Discord 직접, 초과면 Drive (기본값 10 MB) |
 
 ---
 
@@ -151,8 +200,13 @@ FileSharing/
 ├── .env                     # 실제 설정 (직접 생성, git 제외)
 ├── credentials.json         # Google OAuth 키 (직접 배치, git 제외)
 ├── token.pickle             # Google 인증 토큰 (자동 생성, git 제외)
-└── mobile/                  # Android 앱
-    └── ???
+└── android/                 # Android 앱 (Kotlin)
+    ├── app/
+    │   ├── google-services.json     # Google OAuth 설정 (직접 배치, git 제외)
+    │   └── src/main/
+    │       ├── kotlin/com/filesharing/app/
+    │       └── res/
+    └── build.gradle.kts
 ```
 
 ---
