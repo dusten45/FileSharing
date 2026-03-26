@@ -168,11 +168,6 @@ keytool -list -v -keystore ~/.android/debug.keystore -alias androiddebugkey -sto
 5. SHA-1 인증서 지문: 위에서 복사한 SHA-1 값 입력
 6. **만들기** 클릭
 
-#### google-services.json 다운로드 및 배치
-
-1. 클라이언트 ID 목록에서 방금 만든 Android 항목 우측 다운로드(↓) 버튼 클릭
-2. 다운로드된 파일을 **`android/app/google-services.json`** 경로에 배치
-
 ### 2-3. 앱 설정 및 실행
 
 1. **Android Studio** 실행 → **Open** → 이 프로젝트의 **`android/`** 폴더 선택
@@ -202,7 +197,6 @@ FileSharing/
 ├── token.pickle             # Google 인증 토큰 (자동 생성, git 제외)
 └── android/                 # Android 앱 (Kotlin)
     ├── app/
-    │   ├── google-services.json     # Google OAuth 설정 (직접 배치, git 제외)
     │   └── src/main/
     │       ├── kotlin/com/filesharing/app/
     │       └── res/

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 업로드 화살표 아이콘 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,28 L38,48 H48 V72 H60 V48 H70 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34,76 H74 V82 H34 Z" />
+</vector>
