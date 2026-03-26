@@ -19,6 +19,7 @@ from pathlib import Path
 
 import requests
 from dotenv import load_dotenv
+from tkinterdnd2 import TkinterDnD, DND_FILES
 
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -321,7 +322,7 @@ def process_folder(folder_path: str, log):
 
 # ── GUI ───────────────────────────────────────────────────────────────────────
 
-class App(tk.Tk):
+class App(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
         self.title("Discord File Uploader")
@@ -403,6 +404,28 @@ class App(tk.Tk):
         )
         self._folder_btn.pack(side="left", pady=14, padx=(0, 14))
 
+        # ── Drop zone ──
+        self._drop_zone = tk.Frame(self, bg=PANEL, highlightthickness=2,
+                                   highlightbackground=MUTED, highlightcolor=ACCENT)
+        self._drop_zone.pack(fill="x", padx=24, pady=(8, 0))
+
+        self._drop_label = tk.Label(
+            self._drop_zone,
+            text="여기에 파일 또는 폴더를 드래그 & 드롭",
+            font=("Segoe UI", 10),
+            fg=MUTED, bg=PANEL,
+            pady=10,
+        )
+        self._drop_label.pack()
+
+        for widget in (self._drop_zone, self._drop_label):
+            widget.drop_target_register(DND_FILES)
+            widget.dnd_bind("<<DragEnter>>", self._on_drag_enter)
+            widget.dnd_bind("<<DragLeave>>", self._on_drag_leave)
+            widget.dnd_bind("<<Drop>>",      self._on_drop)
+
+        self._drop_zone_colors = (PANEL, MUTED, ACCENT)  # bg, border_normal, border_hover
+
         # ── Log area ──
         log_frame = tk.Frame(self, bg=PANEL)
         log_frame.pack(fill="both", expand=True, padx=24, pady=(8, 24))
@@ -427,7 +450,7 @@ class App(tk.Tk):
         self._log_box.pack(fill="both", expand=True)
         scrollbar.config(command=self._log_box.yview)
 
-        self._log("준비됨. 파일 또는 폴더를 선택하면 자동으로 처리해요.")
+        self._log("준비됨. 파일 또는 폴더를 선택하거나 드래그 & 드롭하세요.")
 
     def _log(self, msg: str):
         self._log_box.config(state="normal")
@@ -479,6 +502,42 @@ class App(tk.Tk):
     def _run_folder(self, folder_path):
         try:
             process_folder(folder_path, lambda msg: self.after(0, self._log, msg))
+        finally:
+            self.after(0, self._set_buttons, True)
+
+    def _on_drag_enter(self, event):
+        bg, _, accent = self._drop_zone_colors
+        self._drop_zone.config(bg=accent, highlightbackground=accent)
+        self._drop_label.config(bg=accent, fg="white")
+
+    def _on_drag_leave(self, event):
+        bg, muted, _ = self._drop_zone_colors
+        self._drop_zone.config(bg=bg, highlightbackground=muted)
+        self._drop_label.config(bg=bg, fg=muted)
+
+    def _on_drop(self, event):
+        if self._file_btn["state"] == "disabled":
+            return
+        paths = self.tk.splitlist(event.data)
+        if not paths:
+            return
+        self._on_drag_leave(None)
+        self._set_buttons(False)
+        threading.Thread(target=self._run_multiple, args=(paths,), daemon=True).start()
+
+    def _run_multiple(self, paths):
+        total = len(paths)
+        try:
+            for i, path in enumerate(paths, 1):
+                label = Path(path).name + ("/" if os.path.isdir(path) else "")
+                self.after(0, self._log, f"\n{'─' * 48}")
+                if total > 1:
+                    self.after(0, self._log, f"[{i}/{total}] {label}")
+                log = lambda msg: self.after(0, self._log, msg)
+                if os.path.isdir(path):
+                    process_folder(path, log)
+                else:
+                    process_file(path, log)
         finally:
             self.after(0, self._set_buttons, True)
 
