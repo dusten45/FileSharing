@@ -123,6 +123,18 @@ export default definePlugin({
                 replace: "uploadFiles:(...args)=>$self.handleUpload(...args,$1)",
             },
         },
+        {
+            // Discord's file input component validates size via maxFileSizeBytes prop.
+            // When a file exceeds that limit, it sets ETOOLARGE on the input element and
+            // the onChange handler calls the error modal — uploadFiles is never reached.
+            // Setting maxFileSizeBytes to Infinity bypasses that early rejection so every
+            // file flows through to uploadFiles, where our handleUpload patch intercepts it.
+            find: "onFileSizeError",
+            replacement: {
+                match: /maxFileSizeBytes:(\i\.\i)/,
+                replace: "maxFileSizeBytes:Infinity",
+            },
+        },
     ],
 
     // -------------------------------------------------------------------------
