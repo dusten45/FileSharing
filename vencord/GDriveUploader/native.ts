@@ -23,18 +23,21 @@ export async function startOAuthServer(
                 const error = url.searchParams.get("error");
 
                 if (error) {
-                    res.end(`<html><body>인증 실패: ${error}. 창을 닫아주세요.</body></html>`);
+                    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+                    res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>인증 실패: ${error}. 창을 닫아주세요.</body></html>`);
                     server.close();
                     reject(new Error(`OAuth error: ${error}`));
                     return;
                 }
                 if (code) {
-                    res.end("<html><body><script>window.close()</script>인증 완료! 창을 닫아주세요.</body></html>");
+                    res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+                    res.end("<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>인증 완료! 창을 닫아주세요.<script>window.close();</script></body></html>");
                     server.close();
                     resolve({ code, port });
                 }
             } catch (e) {
-                res.end("<html><body>오류가 발생했습니다. 창을 닫아주세요.</body></html>");
+                res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+                res.end("<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body>오류가 발생했습니다. 창을 닫아주세요.</body></html>");
                 server.close();
                 reject(e);
             }
