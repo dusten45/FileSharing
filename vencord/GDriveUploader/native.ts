@@ -3,17 +3,20 @@ import type { AddressInfo } from "net";
 import { IpcMainInvokeEvent, shell } from "electron";
 
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 /**
  * 로컬 HTTP 서버를 열어 OAuth 리다이렉트를 받고,
  * 브라우저로 Google 로그인 페이지를 연다.
- * 반환값(code, port)은 렌더러에서 토큰 교환에 사용한다.
+ * 인증 코드를 받은 뒤 메인 프로세스에서 직접 토큰 교환까지 수행한다.
+ * (렌더러에서 fetch하면 Discord의 CSP에 의해 차단되므로 메인 프로세스에서 처리)
  */
-export async function startOAuthServer(
+export async function startOAuthFlow(
     _: IpcMainInvokeEvent,
-    clientId: string
-): Promise<{ code: string; port: number }> {
-    return new Promise((resolve, reject) => {
+    clientId: string,
+    clientSecret: string
+): Promise<{ accessToken: string; refreshToken: string; expiresAt: number }> {
+    const { code, port } = await new Promise<{ code: string; port: number }>((resolve, reject) => {
         let port: number;
 
         const server = createServer(async (req, res) => {
@@ -58,4 +61,52 @@ export async function startOAuthServer(
             shell.openExternal(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
         });
     });
+
+    const res = await fetch(TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            code,
+            client_id: clientId,
+            client_secret: clientSecret,
+            redirect_uri: `http://localhost:${port}`,
+            grant_type: "authorization_code",
+        }),
+    });
+    if (!res.ok) throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
+    const json = await res.json();
+    return {
+        accessToken: json.access_token,
+        refreshToken: json.refresh_token,
+        expiresAt: Date.now() + json.expires_in * 1000,
+    };
+}
+
+/**
+ * 메인 프로세스에서 액세스 토큰을 갱신한다.
+ * (렌더러에서 fetch하면 Discord의 CSP에 의해 차단되므로 메인 프로세스에서 처리)
+ */
+export async function refreshTokens(
+    _: IpcMainInvokeEvent,
+    clientId: string,
+    clientSecret: string,
+    refreshToken: string
+): Promise<{ accessToken: string; refreshToken: string; expiresAt: number }> {
+    const res = await fetch(TOKEN_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            refresh_token: refreshToken,
+            grant_type: "refresh_token",
+        }),
+    });
+    if (!res.ok) throw new Error(`Token refresh failed: ${res.status} ${await res.text()}`);
+    const json = await res.json();
+    return {
+        accessToken: json.access_token,
+        refreshToken: json.refresh_token ?? refreshToken,
+        expiresAt: Date.now() + json.expires_in * 1000,
+    };
 }

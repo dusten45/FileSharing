@@ -1,7 +1,6 @@
 import { DataStore } from "@api/index";
 
 const STORE_KEY = "GDriveUploader_tokens";
-const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
 export interface Tokens {
     accessToken: string;
@@ -9,56 +8,9 @@ export interface Tokens {
     expiresAt: number; // Unix ms
 }
 
-async function exchangeCodeForToken(
-    clientId: string,
-    clientSecret: string,
-    code: string,
-    redirectPort: number
-): Promise<Tokens> {
-    const res = await fetch(TOKEN_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            code,
-            client_id: clientId,
-            client_secret: clientSecret,
-            redirect_uri: `http://localhost:${redirectPort}`,
-            grant_type: "authorization_code",
-        }),
-    });
-    if (!res.ok) throw new Error(`Token exchange failed: ${res.status} ${await res.text()}`);
-    const json = await res.json();
-    return {
-        accessToken: json.access_token,
-        refreshToken: json.refresh_token,
-        expiresAt: Date.now() + json.expires_in * 1000,
-    };
-}
-
 export async function startOAuthFlow(clientId: string, clientSecret: string): Promise<void> {
-    const { code, port } = await VencordNative.pluginHelpers.GDriveUploader.startOAuthServer(clientId);
-    const tokens = await exchangeCodeForToken(clientId, clientSecret, code, port);
+    const tokens = await VencordNative.pluginHelpers.GDriveUploader.startOAuthFlow(clientId, clientSecret);
     await DataStore.set(STORE_KEY, tokens);
-}
-
-async function refreshAccessToken(clientId: string, clientSecret: string, refreshToken: string): Promise<Tokens> {
-    const res = await fetch(TOKEN_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-            client_id: clientId,
-            client_secret: clientSecret,
-            refresh_token: refreshToken,
-            grant_type: "refresh_token",
-        }),
-    });
-    if (!res.ok) throw new Error(`Token refresh failed: ${res.status} ${await res.text()}`);
-    const json = await res.json();
-    return {
-        accessToken: json.access_token,
-        refreshToken: json.refresh_token ?? refreshToken, // refresh_token may not be returned again
-        expiresAt: Date.now() + json.expires_in * 1000,
-    };
 }
 
 export async function getAccessToken(clientId: string, clientSecret: string): Promise<string> {
@@ -67,7 +19,9 @@ export async function getAccessToken(clientId: string, clientSecret: string): Pr
 
     // Refresh 1 minute before expiry
     if (Date.now() >= tokens.expiresAt - 60_000) {
-        const refreshed = await refreshAccessToken(clientId, clientSecret, tokens.refreshToken);
+        const refreshed = await VencordNative.pluginHelpers.GDriveUploader.refreshTokens(
+            clientId, clientSecret, tokens.refreshToken
+        );
         await DataStore.set(STORE_KEY, refreshed);
         return refreshed.accessToken;
     }
