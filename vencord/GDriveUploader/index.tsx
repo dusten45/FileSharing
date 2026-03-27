@@ -1,7 +1,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, Forms, React, Toasts } from "@webpack/common";
+import { Button, Forms, React, SelectedChannelStore, Toasts } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 
 import { formatSize, uploadToDrive } from "./gdrive";
@@ -125,15 +125,22 @@ export default definePlugin({
         },
         {
             // Discord's file input component validates size via maxFileSizeBytes prop.
-            // When a file exceeds that limit, it sets ETOOLARGE on the input element and
-            // the onChange handler calls the error modal — uploadFiles is never reached.
-            // Setting maxFileSizeBytes to Infinity bypasses that early rejection so every
-            // file flows through to uploadFiles, where our handleUpload patch intercepts it.
+            // When a file exceeds that limit, it calls onFileSizeError — uploadFiles is
+            // never reached and the Nitro upsell modal appears.
+            // We do two things: (1) set maxFileSizeBytes to Infinity so validation is
+            // skipped entirely, and (2) intercept onFileSizeError as a fallback in case
+            // the first replacement doesn't match Discord's current minified form.
             find: "onFileSizeError",
-            replacement: {
-                match: /maxFileSizeBytes:(\i(?:\.\i)?)/,
-                replace: "maxFileSizeBytes:Infinity",
-            },
+            replacement: [
+                {
+                    match: /maxFileSizeBytes\s*:\s*[^,}]+/,
+                    replace: "maxFileSizeBytes:Infinity",
+                },
+                {
+                    match: /onFileSizeError:(\i)/,
+                    replace: "onFileSizeError:(...a)=>$self.handleFileSizeError(...a)",
+                },
+            ],
         },
     ],
 
@@ -163,6 +170,22 @@ export default definePlugin({
         for (const item of large) {
             await this.processLargeFile(channelId, item.file);
         }
+    },
+
+    async handleFileSizeError(...args: any[]) {
+        // Fallback: called when onFileSizeError fires (i.e. Patch 2 regex didn't match).
+        // Extracts the File object regardless of whether Discord passes it directly
+        // or wrapped in an object, then routes it to Google Drive instead of showing
+        // the Nitro upsell modal.
+        const file: File | null =
+            args[0] instanceof File ? args[0] :
+            args[0]?.file instanceof File ? args[0].file : null;
+        if (!file) return;
+
+        const channelId = SelectedChannelStore.getChannelId();
+        if (!channelId) return;
+
+        await this.processLargeFile(channelId, file);
     },
 
     async processLargeFile(channelId: string, file: File) {
