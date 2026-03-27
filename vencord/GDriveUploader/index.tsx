@@ -83,7 +83,7 @@ function SettingsPanel() {
                 )}
             </div>
             <Forms.FormDivider style={{ marginTop: 16, marginBottom: 8 }} />
-            <Forms.FormText type={Forms.FormText.Types.DESCRIPTION}>
+            <Forms.FormText>
                 클라이언트 ID와 시크릿은 위의 설정 항목에서 입력하세요.
                 설정 방법은 플러그인 폴더의 README.md를 참고하세요.
             </Forms.FormText>
@@ -131,7 +131,7 @@ export default definePlugin({
             // file flows through to uploadFiles, where our handleUpload patch intercepts it.
             find: "onFileSizeError",
             replacement: {
-                match: /maxFileSizeBytes:(\i\.\i)/,
+                match: /maxFileSizeBytes:(\i(?:\.\i)?)/,
                 replace: "maxFileSizeBytes:Infinity",
             },
         },
