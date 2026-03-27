@@ -1,27 +1,12 @@
 import { DataStore } from "@api/index";
-import { createServer } from "http";
-import type { AddressInfo } from "net";
 
 const STORE_KEY = "GDriveUploader_tokens";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
-const SCOPES = "https://www.googleapis.com/auth/drive.file";
 
 export interface Tokens {
     accessToken: string;
     refreshToken: string;
     expiresAt: number; // Unix ms
-}
-
-function buildOAuthUrl(clientId: string, redirectPort: number): string {
-    const params = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: `http://localhost:${redirectPort}`,
-        response_type: "code",
-        scope: SCOPES,
-        access_type: "offline",
-        prompt: "consent",
-    });
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
 }
 
 async function exchangeCodeForToken(
@@ -51,46 +36,8 @@ async function exchangeCodeForToken(
 }
 
 export async function startOAuthFlow(clientId: string, clientSecret: string): Promise<void> {
-    const tokens = await new Promise<Tokens>((resolve, reject) => {
-        const server = createServer(async (req, res) => {
-            try {
-                const url = new URL(req.url!, "http://localhost");
-                const code = url.searchParams.get("code");
-                const error = url.searchParams.get("error");
-
-                if (error) {
-                    res.end(`<html><body>인증 실패: ${error}. 창을 닫아주세요.</body></html>`);
-                    server.close();
-                    reject(new Error(`OAuth error: ${error}`));
-                    return;
-                }
-                if (code) {
-                    res.end("<html><body><script>window.close()</script>인증 완료! 창을 닫아주세요.</body></html>");
-                    server.close();
-                    const t = await exchangeCodeForToken(clientId, clientSecret, code, port);
-                    resolve(t);
-                }
-            } catch (e) {
-                res.end("<html><body>오류가 발생했습니다. 창을 닫아주세요.</body></html>");
-                server.close();
-                reject(e);
-            }
-        });
-
-        server.listen(0);
-        const port = (server.address() as AddressInfo).port;
-
-        // Open browser for Google login
-        // electron.shell is available in Vencord's Electron context
-        try {
-            const { shell } = require("electron");
-            shell.openExternal(buildOAuthUrl(clientId, port));
-        } catch {
-            // Fallback: open via window.open (works in web mode)
-            window.open(buildOAuthUrl(clientId, port), "_blank");
-        }
-    });
-
+    const { code, port } = await VencordNative.pluginHelpers.GDriveUploader.startOAuthServer(clientId);
+    const tokens = await exchangeCodeForToken(clientId, clientSecret, code, port);
     await DataStore.set(STORE_KEY, tokens);
 }
 
