@@ -1,7 +1,7 @@
 import { definePluginSettings } from "@api/Settings";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, Forms, React, SelectedChannelStore, Toasts } from "@webpack/common";
+import { Button, DraftType, Forms, React, SelectedChannelStore, Toasts, UploadManager } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 
 import { formatSize, uploadToDrive } from "./gdrive";
@@ -92,6 +92,18 @@ function SettingsPanel() {
 }
 
 // ---------------------------------------------------------------------------
+// UploadManager helper — clear any state Discord may have accumulated so the
+// Nitro upsell modal never gets a chance to appear.
+// ---------------------------------------------------------------------------
+
+function clearUploadManager(channelId: string) {
+    try {
+        UploadManager.clearAll(channelId, DraftType.ChannelMessage);
+        UploadManager.clearAll(channelId, DraftType.SlashCommand);
+    } catch { /* ignore — API shape may vary across Discord versions */ }
+}
+
+// ---------------------------------------------------------------------------
 // Upload file type used in Discord's internal upload module
 // ---------------------------------------------------------------------------
 
@@ -112,37 +124,125 @@ export default definePlugin({
     settings,
 
     // -------------------------------------------------------------------------
-    // Webpack patch (Method A) — intercept Discord's uploadFiles at module load
+    // Webpack patch — intercept Discord's uploadFiles at module load.
+    // Handles the upload-button / context-menu path (not covered by DOM events).
+    // The previous "onFileSizeError" patch has been removed: it relied on a
+    // fragile regex that breaks whenever Discord updates its minified JS, and the
+    // event-level interception below is a more reliable replacement.
     // -------------------------------------------------------------------------
     patches: [
         {
             find: "uploadFiles:",
             replacement: {
-                // Match the uploadFiles function reference in Discord's upload module object
                 match: /uploadFiles:(\i)/,
                 replace: "uploadFiles:(...args)=>$self.handleUpload(...args,$1)",
             },
         },
-        {
-            // Discord's file input component validates size via maxFileSizeBytes prop.
-            // When a file exceeds that limit, it calls onFileSizeError — uploadFiles is
-            // never reached and the Nitro upsell modal appears.
-            // We do two things: (1) set maxFileSizeBytes to Infinity so validation is
-            // skipped entirely, and (2) intercept onFileSizeError as a fallback in case
-            // the first replacement doesn't match Discord's current minified form.
-            find: "onFileSizeError",
-            replacement: [
-                {
-                    match: /maxFileSizeBytes\s*:\s*[^,}]+/,
-                    replace: "maxFileSizeBytes:Infinity",
-                },
-                {
-                    match: /onFileSizeError:(\i)/,
-                    replace: "onFileSizeError:(...a)=>$self.handleFileSizeError(...a)",
-                },
-            ],
-        },
     ],
+
+    // -------------------------------------------------------------------------
+    // Lifecycle hooks — register/deregister DOM event listeners
+    // -------------------------------------------------------------------------
+
+    // Bound copies stored so the same function reference is used in both
+    // addEventListener and removeEventListener.
+    _boundPaste: null as EventListener | null,
+    _boundDrop: null as EventListener | null,
+    _boundDragOver: null as EventListener | null,
+
+    start() {
+        this._boundPaste = (e: Event) => this._handlePaste(e as ClipboardEvent);
+        this._boundDrop = (e: Event) => this._handleDrop(e as DragEvent);
+        this._boundDragOver = (e: Event) => this._handleDragOver(e as DragEvent);
+
+        // capture: true → fires before Discord's own (bubbling) listeners
+        document.addEventListener("paste", this._boundPaste, { capture: true });
+        document.addEventListener("drop", this._boundDrop, { capture: true });
+        document.addEventListener("dragover", this._boundDragOver, { capture: true });
+    },
+
+    stop() {
+        if (this._boundPaste) document.removeEventListener("paste", this._boundPaste, { capture: true });
+        if (this._boundDrop) document.removeEventListener("drop", this._boundDrop, { capture: true });
+        if (this._boundDragOver) document.removeEventListener("dragover", this._boundDragOver, { capture: true });
+    },
+
+    // -------------------------------------------------------------------------
+    // DOM event handlers
+    // -------------------------------------------------------------------------
+
+    _handlePaste(e: ClipboardEvent) {
+        const files = e.clipboardData?.files;
+        if (!files || files.length === 0) return;
+
+        const fileArray = Array.from(files);
+        const limitBytes = settings.store.sizeLimitMB * 1024 * 1024;
+        if (!fileArray.some(f => f.size > limitBytes)) return; // all small — let Discord handle
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        const channelId = SelectedChannelStore.getChannelId();
+        if (!channelId) return;
+        clearUploadManager(channelId);
+
+        const small = fileArray.filter(f => f.size <= limitBytes);
+        const large = fileArray.filter(f => f.size > limitBytes);
+
+        if (small.length > 0) {
+            UploadManager.addFiles({
+                channelId,
+                draftType: DraftType.ChannelMessage,
+                files: small.map(f => ({ file: f, platform: 1 })),
+                showLargeMessageDialog: false,
+            });
+        }
+
+        for (const file of large) {
+            this.processLargeFile(channelId, file);
+        }
+    },
+
+    _handleDrop(e: DragEvent) {
+        const files = e.dataTransfer?.files;
+        if (!files || files.length === 0) return;
+
+        const fileArray = Array.from(files);
+        const limitBytes = settings.store.sizeLimitMB * 1024 * 1024;
+        if (!fileArray.some(f => f.size > limitBytes)) return; // all small — let Discord handle
+
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+
+        const channelId = SelectedChannelStore.getChannelId();
+        if (!channelId) return;
+        clearUploadManager(channelId);
+
+        const small = fileArray.filter(f => f.size <= limitBytes);
+        const large = fileArray.filter(f => f.size > limitBytes);
+
+        if (small.length > 0) {
+            UploadManager.addFiles({
+                channelId,
+                draftType: DraftType.ChannelMessage,
+                files: small.map(f => ({ file: f, platform: 1 })),
+                showLargeMessageDialog: false,
+            });
+        }
+
+        for (const file of large) {
+            this.processLargeFile(channelId, file);
+        }
+    },
+
+    _handleDragOver(e: DragEvent) {
+        // preventDefault() is required to make the element a valid drop target
+        if (e.dataTransfer?.types?.includes("Files")) {
+            e.preventDefault();
+        }
+    },
 
     // -------------------------------------------------------------------------
     // Upload interceptor
