@@ -6,6 +6,11 @@ const CHUNK_SIZE = 256 * 1024 * 10;
 
 export type ProgressCallback = (percent: number) => void;
 
+export interface FileEntry {
+    file: File;
+    relativePath: string; // 루트 폴더 기준 상대경로, e.g. "src/index.ts"
+}
+
 function formatSize(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -14,8 +19,33 @@ function formatSize(bytes: number): string {
 
 export { formatSize };
 
-async function initResumableUpload(file: File, accessToken: string): Promise<string> {
-    const metadata = { name: file.name };
+async function collectFilesFromEntry(
+    entry: FileSystemEntry,
+    pathPrefix: string,
+    results: FileEntry[]
+): Promise<void> {
+    if (entry.isFile) {
+        const file = await new Promise<File>((res, rej) =>
+            (entry as FileSystemFileEntry).file(res, rej)
+        );
+        results.push({ file, relativePath: pathPrefix + entry.name });
+    } else if (entry.isDirectory) {
+        const reader = (entry as FileSystemDirectoryEntry).createReader();
+        let batch: FileSystemEntry[];
+        do {
+            batch = await new Promise<FileSystemEntry[]>((res, rej) =>
+                reader.readEntries(res, rej)
+            );
+            for (const child of batch) {
+                await collectFilesFromEntry(child, pathPrefix + entry.name + "/", results);
+            }
+        } while (batch.length > 0);
+    }
+}
+
+async function initResumableUpload(file: File, accessToken: string, parentId?: string): Promise<string> {
+    const metadata: Record<string, unknown> = { name: file.name };
+    if (parentId) metadata.parents = [parentId];
     const res = await fetch(`${UPLOAD_BASE}?uploadType=resumable`, {
         method: "POST",
         headers: {
@@ -80,6 +110,25 @@ async function uploadChunks(
     return fileId;
 }
 
+async function createDriveFolder(name: string, accessToken: string, parentId?: string): Promise<string> {
+    const metadata: Record<string, unknown> = {
+        name,
+        mimeType: "application/vnd.google-apps.folder",
+    };
+    if (parentId) metadata.parents = [parentId];
+
+    const res = await fetch(`${API_BASE}?fields=id`, {
+        method: "POST",
+        headers: {
+            Authorization: `Bearer ${accessToken}`,
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(metadata),
+    });
+    if (!res.ok) throw new Error(`Drive folder create failed: ${res.status} ${await res.text()}`);
+    return (await res.json()).id as string;
+}
+
 async function setPublicReadPermission(fileId: string, accessToken: string): Promise<void> {
     const res = await fetch(`${API_BASE}/${fileId}/permissions`, {
         method: "POST",
@@ -94,6 +143,58 @@ async function setPublicReadPermission(fileId: string, accessToken: string): Pro
         const body = await res.text();
         throw new Error(`Drive permission set failed: ${res.status} ${body}`);
     }
+}
+
+/**
+ * 폴더를 Google Drive에 폴더 구조 그대로 업로드하고 공개 공유 링크를 반환한다.
+ * @param rootEntry   드롭된 루트 디렉터리 엔트리
+ * @param accessToken Google OAuth2 액세스 토큰
+ * @param onProgress  진행률 콜백 (0~100, 파일 완료 단위)
+ * @returns           공개 Google Drive 폴더 링크
+ */
+export async function uploadFolderToDrive(
+    rootEntry: FileSystemDirectoryEntry,
+    accessToken: string,
+    onProgress: ProgressCallback = () => {}
+): Promise<string> {
+    // 1. 전체 파일 목록 수집
+    const results: FileEntry[] = [];
+    await collectFilesFromEntry(rootEntry, "", results);
+    onProgress(0);
+
+    // 2. 루트 Drive 폴더 생성
+    const rootId = await createDriveFolder(rootEntry.name, accessToken);
+
+    // 3. 하위 폴더 경로 추출 및 생성 (부모 먼저)
+    const folderIdMap = new Map<string, string>([["", rootId]]);
+    const dirPaths = new Set<string>();
+    for (const { relativePath } of results) {
+        const parts = relativePath.split("/");
+        for (let i = 1; i < parts.length; i++) {
+            dirPaths.add(parts.slice(0, i).join("/"));
+        }
+    }
+    for (const dirPath of [...dirPaths].sort((a, b) => a.length - b.length)) {
+        const segments = dirPath.split("/");
+        const parentPath = segments.slice(0, -1).join("/");
+        const dirId = await createDriveFolder(segments[segments.length - 1], accessToken, folderIdMap.get(parentPath));
+        folderIdMap.set(dirPath, dirId);
+    }
+
+    // 4. 파일 업로드 (파일 완료 단위 진행률)
+    for (let i = 0; i < results.length; i++) {
+        const { file, relativePath } = results[i];
+        const lastSlash = relativePath.lastIndexOf("/");
+        const dirPath = lastSlash >= 0 ? relativePath.substring(0, lastSlash) : "";
+        const uploadUrl = await initResumableUpload(file, accessToken, folderIdMap.get(dirPath));
+        await uploadChunks(file, uploadUrl, () => {});
+        onProgress(Math.round(((i + 1) / results.length) * 100));
+    }
+
+    // 5. 루트 폴더 공개 설정 (하위 항목에 자동 상속)
+    await setPublicReadPermission(rootId, accessToken);
+    onProgress(100);
+    return `https://drive.google.com/drive/folders/${rootId}`;
 }
 
 /**
