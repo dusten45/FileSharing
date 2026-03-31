@@ -4,7 +4,7 @@ import definePlugin, { OptionType } from "@utils/types";
 import { Button, DraftType, Forms, React, SelectedChannelStore, Toasts, UploadManager } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 
-import { formatSize, uploadToDrive } from "./gdrive";
+import { formatSize, uploadToDrive, uploadFolderToDrive } from "./gdrive";
 import { getAccessToken, isAuthenticated, revokeTokens, startOAuthFlow } from "./auth";
 
 // ---------------------------------------------------------------------------
@@ -209,12 +209,32 @@ export default definePlugin({
     },
 
     _handleDrop(e: DragEvent) {
-        const files = e.dataTransfer?.files;
-        if (!files || files.length === 0) return;
+        const items = e.dataTransfer?.items;
+        if (!items || items.length === 0) return;
 
-        const fileArray = Array.from(files);
+        // items는 이벤트 핸들러 종료 후 무효화되므로 동기적으로 스냅샷
+        type Snapshot =
+            | { kind: "file"; file: File }
+            | { kind: "folder"; entry: FileSystemDirectoryEntry };
+
+        const snapshot: Snapshot[] = [];
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.kind !== "file") continue;
+            const fsEntry = item.webkitGetAsEntry();
+            if (fsEntry?.isDirectory) {
+                snapshot.push({ kind: "folder", entry: fsEntry as FileSystemDirectoryEntry });
+            } else {
+                const file = item.getAsFile();
+                if (file) snapshot.push({ kind: "file", file });
+            }
+        }
+        if (snapshot.length === 0) return;
+
         const limitBytes = settings.store.sizeLimitMB * 1024 * 1024;
-        if (!fileArray.some(f => f.size > limitBytes)) return; // all small — let Discord handle
+        const hasFolders = snapshot.some(s => s.kind === "folder");
+        const hasLargeFiles = snapshot.some(s => s.kind === "file" && s.file.size > limitBytes);
+        if (!hasFolders && !hasLargeFiles) return; // 소파일만 — Discord에게 위임
 
         e.preventDefault();
         e.stopPropagation();
@@ -224,21 +244,26 @@ export default definePlugin({
         if (!channelId) return;
         clearUploadManager(channelId);
 
-        const small = fileArray.filter(f => f.size <= limitBytes);
-        const large = fileArray.filter(f => f.size > limitBytes);
+        const smallFiles = snapshot
+            .filter((s): s is { kind: "file"; file: File } => s.kind === "file" && s.file.size <= limitBytes)
+            .map(s => s.file);
+        const largeFiles = snapshot
+            .filter((s): s is { kind: "file"; file: File } => s.kind === "file" && s.file.size > limitBytes)
+            .map(s => s.file);
+        const folderEntries = snapshot
+            .filter((s): s is { kind: "folder"; entry: FileSystemDirectoryEntry } => s.kind === "folder")
+            .map(s => s.entry);
 
-        if (small.length > 0) {
+        if (smallFiles.length > 0) {
             UploadManager.addFiles({
                 channelId,
                 draftType: DraftType.ChannelMessage,
-                files: small.map(f => ({ file: f, platform: 1 })),
+                files: smallFiles.map(f => ({ file: f, platform: 1 })),
                 showLargeMessageDialog: false,
             });
         }
-
-        for (const file of large) {
-            this.processLargeFile(channelId, file);
-        }
+        for (const file of largeFiles) this.processLargeFile(channelId, file);
+        for (const entry of folderEntries) this.processFolder(channelId, entry);
     },
 
     _handleDragOver(e: DragEvent) {
@@ -327,6 +352,41 @@ export default definePlugin({
         if (!channelId) return;
 
         await this.processLargeFile(channelId, file);
+    },
+
+    async processFolder(channelId: string, entry: FileSystemDirectoryEntry) {
+        const { clientId, clientSecret } = settings.store;
+        if (!clientId || !clientSecret) {
+            Toasts.show({ message: "GDriveUploader: 클라이언트 ID/시크릿이 설정되지 않았습니다.", type: Toasts.Type.FAILURE });
+            return;
+        }
+        let accessToken: string;
+        try {
+            accessToken = await getAccessToken(clientId, clientSecret);
+        } catch (e: any) {
+            Toasts.show({ message: `GDriveUploader: ${e.message}`, type: Toasts.Type.FAILURE });
+            return;
+        }
+
+        Toasts.show({ message: `폴더 업로드 시작: ${entry.name}`, type: Toasts.Type.MESSAGE, id: "gdrive-folder-upload-start" });
+
+        try {
+            const link = await uploadFolderToDrive(entry, accessToken, percent => {
+                Toasts.show({
+                    message: `폴더 업로드 중... ${percent}%  ${entry.name}`,
+                    type: Toasts.Type.MESSAGE,
+                    id: "gdrive-folder-upload-progress",
+                });
+            });
+            sendMessage(channelId, {
+                content:
+                    `📂 **${entry.name}/**\n` +
+                    `-# 폴더가 너무 커서 Discord 대신 Google Drive에 업로드됐어요.\n${link}`,
+            });
+            Toasts.show({ message: `폴더 업로드 완료: ${entry.name}`, type: Toasts.Type.SUCCESS });
+        } catch (e: any) {
+            Toasts.show({ message: `폴더 업로드 실패: ${e.message}`, type: Toasts.Type.FAILURE });
+        }
     },
 
     async processLargeFile(channelId: string, file: File) {
