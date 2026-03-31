@@ -149,22 +149,26 @@ export default definePlugin({
     _boundPaste: null as EventListener | null,
     _boundDrop: null as EventListener | null,
     _boundDragOver: null as EventListener | null,
+    _boundChange: null as EventListener | null,
 
     start() {
         this._boundPaste = (e: Event) => this._handlePaste(e as ClipboardEvent);
         this._boundDrop = (e: Event) => this._handleDrop(e as DragEvent);
         this._boundDragOver = (e: Event) => this._handleDragOver(e as DragEvent);
+        this._boundChange = (e: Event) => this._handleFileInputChange(e);
 
         // capture: true → fires before Discord's own (bubbling) listeners
         document.addEventListener("paste", this._boundPaste, { capture: true });
         document.addEventListener("drop", this._boundDrop, { capture: true });
         document.addEventListener("dragover", this._boundDragOver, { capture: true });
+        document.addEventListener("change", this._boundChange, { capture: true });
     },
 
     stop() {
         if (this._boundPaste) document.removeEventListener("paste", this._boundPaste, { capture: true });
         if (this._boundDrop) document.removeEventListener("drop", this._boundDrop, { capture: true });
         if (this._boundDragOver) document.removeEventListener("dragover", this._boundDragOver, { capture: true });
+        if (this._boundChange) document.removeEventListener("change", this._boundChange, { capture: true });
     },
 
     // -------------------------------------------------------------------------
@@ -241,6 +245,43 @@ export default definePlugin({
         // preventDefault() is required to make the element a valid drop target
         if (e.dataTransfer?.types?.includes("Files")) {
             e.preventDefault();
+        }
+    },
+
+    _handleFileInputChange(e: Event) {
+        const target = e.target as HTMLInputElement;
+        if (target.type !== "file" || !target.files?.length) return;
+
+        const files = Array.from(target.files);
+        const limitBytes = settings.store.sizeLimitMB * 1024 * 1024;
+        if (!files.some(f => f.size > limitBytes)) return; // all small — let Discord handle
+
+        // Grab files before clearing the input
+        const channelId = SelectedChannelStore.getChannelId();
+        if (!channelId) return;
+
+        // Clear the input so Discord sees no files when its own handler runs
+        target.value = "";
+
+        // Prevent Discord's change handler from firing at all
+        e.stopImmediatePropagation();
+
+        clearUploadManager(channelId);
+
+        const small = files.filter(f => f.size <= limitBytes);
+        const large = files.filter(f => f.size > limitBytes);
+
+        if (small.length > 0) {
+            UploadManager.addFiles({
+                channelId,
+                draftType: DraftType.ChannelMessage,
+                files: small.map(f => ({ file: f, platform: 1 })),
+                showLargeMessageDialog: false,
+            });
+        }
+
+        for (const file of large) {
+            this.processLargeFile(channelId, file);
         }
     },
 
