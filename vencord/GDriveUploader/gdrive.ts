@@ -43,6 +43,49 @@ async function collectFilesFromEntry(
     }
 }
 
+async function uploadFileEntriesToDrive(
+    folderName: string,
+    entries: FileEntry[],
+    accessToken: string,
+    onProgress: ProgressCallback
+): Promise<string> {
+    onProgress(0);
+
+    // 루트 Drive 폴더 생성
+    const rootId = await createDriveFolder(folderName, accessToken);
+
+    // 하위 폴더 경로 추출 및 생성 (부모 먼저)
+    const folderIdMap = new Map<string, string>([["", rootId]]);
+    const dirPaths = new Set<string>();
+    for (const { relativePath } of entries) {
+        const parts = relativePath.split("/");
+        for (let i = 1; i < parts.length; i++) {
+            dirPaths.add(parts.slice(0, i).join("/"));
+        }
+    }
+    for (const dirPath of [...dirPaths].sort((a, b) => a.length - b.length)) {
+        const segments = dirPath.split("/");
+        const parentPath = segments.slice(0, -1).join("/");
+        const dirId = await createDriveFolder(segments[segments.length - 1], accessToken, folderIdMap.get(parentPath));
+        folderIdMap.set(dirPath, dirId);
+    }
+
+    // 파일 업로드 (파일 완료 단위 진행률)
+    for (let i = 0; i < entries.length; i++) {
+        const { file, relativePath } = entries[i];
+        const lastSlash = relativePath.lastIndexOf("/");
+        const dirPath = lastSlash >= 0 ? relativePath.substring(0, lastSlash) : "";
+        const uploadUrl = await initResumableUpload(file, accessToken, folderIdMap.get(dirPath));
+        await uploadChunks(file, uploadUrl, () => {});
+        onProgress(Math.round(((i + 1) / entries.length) * 100));
+    }
+
+    // 루트 폴더 공개 설정 (하위 항목에 자동 상속)
+    await setPublicReadPermission(rootId, accessToken);
+    onProgress(100);
+    return `https://drive.google.com/drive/folders/${rootId}`;
+}
+
 async function initResumableUpload(file: File, accessToken: string, parentId?: string): Promise<string> {
     const metadata: Record<string, unknown> = { name: file.name };
     if (parentId) metadata.parents = [parentId];
@@ -157,44 +200,38 @@ export async function uploadFolderToDrive(
     accessToken: string,
     onProgress: ProgressCallback = () => {}
 ): Promise<string> {
-    // 1. 전체 파일 목록 수집
     const results: FileEntry[] = [];
     await collectFilesFromEntry(rootEntry, "", results);
-    onProgress(0);
+    return uploadFileEntriesToDrive(rootEntry.name, results, accessToken, onProgress);
+}
 
-    // 2. 루트 Drive 폴더 생성
-    const rootId = await createDriveFolder(rootEntry.name, accessToken);
+/**
+ * <input type="file" webkitdirectory> 에서 얻은 FileList를 Google Drive에
+ * 폴더 구조 그대로 업로드하고 공개 공유 링크를 반환한다.
+ *
+ * 각 File의 webkitRelativePath 형식: "folderName/sub/file.txt"
+ * 첫 세그먼트(폴더명)를 Drive 루트 폴더명으로 사용하고, relativePath에서는 제거한다.
+ */
+export async function uploadFolderFromFileList(
+    files: FileList,
+    accessToken: string,
+    onProgress: ProgressCallback = () => {}
+): Promise<string> {
+    if (files.length === 0) throw new Error("파일 목록이 비어 있습니다.");
 
-    // 3. 하위 폴더 경로 추출 및 생성 (부모 먼저)
-    const folderIdMap = new Map<string, string>([["", rootId]]);
-    const dirPaths = new Set<string>();
-    for (const { relativePath } of results) {
-        const parts = relativePath.split("/");
-        for (let i = 1; i < parts.length; i++) {
-            dirPaths.add(parts.slice(0, i).join("/"));
-        }
-    }
-    for (const dirPath of [...dirPaths].sort((a, b) => a.length - b.length)) {
-        const segments = dirPath.split("/");
-        const parentPath = segments.slice(0, -1).join("/");
-        const dirId = await createDriveFolder(segments[segments.length - 1], accessToken, folderIdMap.get(parentPath));
-        folderIdMap.set(dirPath, dirId);
-    }
+    const firstPath = files[0].webkitRelativePath;
+    const rootFolderName = firstPath.split("/")[0] || "folder";
 
-    // 4. 파일 업로드 (파일 완료 단위 진행률)
-    for (let i = 0; i < results.length; i++) {
-        const { file, relativePath } = results[i];
-        const lastSlash = relativePath.lastIndexOf("/");
-        const dirPath = lastSlash >= 0 ? relativePath.substring(0, lastSlash) : "";
-        const uploadUrl = await initResumableUpload(file, accessToken, folderIdMap.get(dirPath));
-        await uploadChunks(file, uploadUrl, () => {});
-        onProgress(Math.round(((i + 1) / results.length) * 100));
+    const entries: FileEntry[] = [];
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const rel = file.webkitRelativePath;
+        const slashIdx = rel.indexOf("/");
+        const relativePath = slashIdx >= 0 ? rel.substring(slashIdx + 1) : rel;
+        entries.push({ file, relativePath });
     }
 
-    // 5. 루트 폴더 공개 설정 (하위 항목에 자동 상속)
-    await setPublicReadPermission(rootId, accessToken);
-    onProgress(100);
-    return `https://drive.google.com/drive/folders/${rootId}`;
+    return uploadFileEntriesToDrive(rootFolderName, entries, accessToken, onProgress);
 }
 
 /**
