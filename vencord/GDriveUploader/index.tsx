@@ -1,10 +1,11 @@
+import { ChatBarButton } from "@api/ChatButtons";
 import { definePluginSettings } from "@api/Settings";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { Button, DraftType, Forms, React, SelectedChannelStore, Toasts, UploadManager } from "@webpack/common";
 import { sendMessage } from "@utils/discord";
 
-import { formatSize, uploadToDrive, uploadFolderToDrive } from "./gdrive";
+import { formatSize, uploadToDrive, uploadFolderToDrive, uploadFolderFromFileList } from "./gdrive";
 import { getAccessToken, isAuthenticated, revokeTokens, startOAuthFlow } from "./auth";
 
 // ---------------------------------------------------------------------------
@@ -381,9 +382,46 @@ export default definePlugin({
             sendMessage(channelId, {
                 content:
                     `📂 **${entry.name}/**\n` +
-                    `-# 폴더가 너무 커서 Discord 대신 Google Drive에 업로드됐어요.\n${link}`,
+                    `-# Discord는 폴더 업로드를 지원하지 않아 Google Drive에 업로드됐어요.\n${link}`,
             });
             Toasts.show({ message: `폴더 업로드 완료: ${entry.name}`, type: Toasts.Type.SUCCESS });
+        } catch (e: any) {
+            Toasts.show({ message: `폴더 업로드 실패: ${e.message}`, type: Toasts.Type.FAILURE });
+        }
+    },
+
+    async processFolderFromFileList(channelId: string, files: FileList) {
+        const { clientId, clientSecret } = settings.store;
+        if (!clientId || !clientSecret) {
+            Toasts.show({ message: "GDriveUploader: 클라이언트 ID/시크릿이 설정되지 않았습니다.", type: Toasts.Type.FAILURE });
+            return;
+        }
+        let accessToken: string;
+        try {
+            accessToken = await getAccessToken(clientId, clientSecret);
+        } catch (e: any) {
+            Toasts.show({ message: `GDriveUploader: ${e.message}`, type: Toasts.Type.FAILURE });
+            return;
+        }
+
+        const folderName = files[0]?.webkitRelativePath?.split("/")[0] ?? "folder";
+
+        Toasts.show({ message: `폴더 업로드 시작: ${folderName}`, type: Toasts.Type.MESSAGE, id: "gdrive-folder-upload-start" });
+
+        try {
+            const link = await uploadFolderFromFileList(files, accessToken, percent => {
+                Toasts.show({
+                    message: `폴더 업로드 중... ${percent}%  ${folderName}`,
+                    type: Toasts.Type.MESSAGE,
+                    id: "gdrive-folder-upload-progress",
+                });
+            });
+            sendMessage(channelId, {
+                content:
+                    `📂 **${folderName}/**\n` +
+                    `-# Discord는 폴더 업로드를 지원하지 않아 Google Drive에 업로드됐어요.\n${link}`,
+            });
+            Toasts.show({ message: `폴더 업로드 완료: ${folderName}`, type: Toasts.Type.SUCCESS });
         } catch (e: any) {
             Toasts.show({ message: `폴더 업로드 실패: ${e.message}`, type: Toasts.Type.FAILURE });
         }
@@ -446,4 +484,33 @@ export default definePlugin({
     // -------------------------------------------------------------------------
 
     settingsAboutComponent: SettingsPanel,
+
+    renderChatBarButton(channelId: string, isMainChat: boolean) {
+        if (!isMainChat) return null;
+        return (
+            <ChatBarButton
+                tooltip="폴더 업로드"
+                onClick={() => {
+                    const input = document.createElement("input");
+                    input.type = "file";
+                    (input as any).webkitdirectory = true;
+                    input.style.display = "none";
+                    document.body.appendChild(input);
+                    input.addEventListener("change", () => {
+                        const files = input.files;
+                        document.body.removeChild(input);
+                        if (!files || files.length === 0) return;
+                        this.processFolderFromFileList(channelId, files);
+                    }, { once: true });
+                    input.click();
+                }}
+                buttonProps={{ "aria-label": "폴더 업로드" }}
+            >
+                <svg aria-hidden="true" role="img" width="24" height="24" viewBox="0 0 24 24">
+                    <path fill="currentColor"
+                        d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
+                </svg>
+            </ChatBarButton>
+        );
+    },
 });
