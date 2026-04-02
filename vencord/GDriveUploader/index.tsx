@@ -115,10 +115,21 @@ interface DiscordUploadFile {
 }
 
 // ---------------------------------------------------------------------------
+// Chat bar icon component (used by the new chatBarButton API)
+// ---------------------------------------------------------------------------
+
+const FolderIcon = ({ className }: { className?: string }) => (
+    <svg aria-hidden="true" role="img" width="24" height="24" viewBox="0 0 24 24" className={className}>
+        <path fill="currentColor"
+            d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
+    </svg>
+);
+
+// ---------------------------------------------------------------------------
 // Plugin
 // ---------------------------------------------------------------------------
 
-export default definePlugin({
+const plugin = definePlugin({
     name: "GDriveUploader",
     description: "10MB를 초과하는 파일을 Google Drive에 자동 업로드하고 링크를 채널에 전송합니다",
     authors: [Devs.Ven], // placeholder — replace with your own entry in Devs constant
@@ -485,32 +496,37 @@ export default definePlugin({
 
     settingsAboutComponent: SettingsPanel,
 
-    renderChatBarButton(channelId: string, isMainChat: boolean) {
-        if (!isMainChat) return null;
-        return (
-            <ChatBarButton
-                tooltip="폴더 업로드"
-                onClick={() => {
-                    const input = document.createElement("input");
-                    input.type = "file";
-                    (input as any).webkitdirectory = true;
-                    input.style.display = "none";
-                    document.body.appendChild(input);
-                    input.addEventListener("change", () => {
-                        const files = input.files;
-                        document.body.removeChild(input);
-                        if (!files || files.length === 0) return;
-                        this.processFolderFromFileList(channelId, files);
-                    }, { once: true });
-                    input.click();
-                }}
-                buttonProps={{ "aria-label": "폴더 업로드" }}
-            >
-                <svg aria-hidden="true" role="img" width="24" height="24" viewBox="0 0 24 24">
-                    <path fill="currentColor"
-                        d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
-                </svg>
-            </ChatBarButton>
-        );
+    chatBarButton: {
+        icon: FolderIcon,
+        render: ({ channelId, isMainChat }: { channelId: string; isMainChat: boolean; }) => {
+            if (!isMainChat) return null;
+            return (
+                <ChatBarButton
+                    tooltip="폴더 업로드"
+                    onClick={() => {
+                        const input = document.createElement("input");
+                        input.type = "file";
+                        (input as any).webkitdirectory = true;
+                        input.style.display = "none";
+                        document.body.appendChild(input);
+                        input.addEventListener("change", () => {
+                            const files = input.files;
+                            document.body.removeChild(input);
+                            if (!files || files.length === 0) return;
+                            plugin.processFolderFromFileList(channelId, files);
+                        }, { once: true });
+                        input.click();
+                    }}
+                    buttonProps={{ "aria-label": "폴더 업로드" }}
+                >
+                    <svg aria-hidden="true" role="img" width="24" height="24" viewBox="0 0 24 24">
+                        <path fill="currentColor"
+                            d="M20 6h-8l-2-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2z" />
+                    </svg>
+                </ChatBarButton>
+            );
+        },
     },
 });
+
+export default plugin;
